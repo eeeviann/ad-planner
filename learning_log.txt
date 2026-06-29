@@ -1,0 +1,62 @@
+=== 2026-06-24 21:12:53.173 ===
+Problem: 某工厂生产甲、乙两种产品。甲每件利润3元，乙每件利润5元。甲每件用设备2小时，乙用1小时，共12小时。甲每件用原料3单位，乙用1单位，共18单位。求最大利润。
+Status: failed
+Error: LLM HTTP 错误: {"code":20015,"message":"The parameter is invalid. Please check again.","data":null}
+Attempts: 1
+LLM Response: 
+Objective: 0
+
+=== 2026-06-24 21:14:17.841 ===
+Problem: 某工厂生产甲、乙两种产品。甲每件利润3元，乙每件利润5元。甲每件用设备2小时，乙用1小时，共12小时。甲每件用原料3单位，乙用1单位，共18单位。求最大利润。
+Status: failed
+Error: 未能提取到变量
+Attempts: 1
+LLM Response: {"id":"019ef9c456ada8cd5eb30d2df8b00789","object":"chat.completion","created":1782306854,"model":"deepseek-ai/DeepSeek-V3","choices":[{"index":0,"message":{"role":"assistant","content":"```json\n{\"v\":[\"x:甲产品数量\",\"y:乙产品数量\"],\"c\":[\"2*x + 1*y \u003c= 12\",\"3*x + 1*y \u003c= 18\"],\"o\":\"3*x + 5*y\",\"t\":\"maximize\"}\n```"},"finish_reason":"stop"}],"usage":{"prompt_tokens":390,"completion_tokens":59,"total_tokens":449,"prompt_tokens_details":{"cached_tokens":0},"prompt_cache_hit_tokens":0,"prompt_cache_miss_tokens":390},"system_fingerprint":""}
+
+Objective: 0
+
+=== 2026-06-24 21:15:48.312 ===
+Problem: 某工厂生产甲、乙两种产品。甲每件利润3元，乙每件利润5元。甲每件用设备2小时，乙用1小时，共12小时。甲每件用原料3单位，乙用1单位，共18单位。求最大利润。
+Status: failed
+Error: 未能提取到变量
+Attempts: 1
+LLM Response: {"id":"019ef9c5bb04f242e354be34ad15ed4e","object":"chat.completion","created":1782306945,"model":"deepseek-ai/DeepSeek-V3","choices":[{"index":0,"message":{"role":"assistant","content":"```json\n{\"v\":[\"x:甲产品数量\",\"y:乙产品数量\"],\"c\":[\"2*x + 1*y \u003c= 12\",\"3*x + 1*y \u003c= 18\"],\"o\":\"3*x + 5*y\",\"t\":\"maximize\"}\n```"},"finish_reason":"stop"}],"usage":{"prompt_tokens":390,"completion_tokens":59,"total_tokens":449,"prompt_tokens_details":{"cached_tokens":0},"prompt_cache_hit_tokens":0,"prompt_cache_miss_tokens":390},"system_fingerprint":""}
+
+Objective: 0
+
+=== 2026-06-24 21:17:46.406 ===
+Problem: 某工厂生产甲、乙两种产品。甲每件利润3元，乙每件利润5元。甲每件用设备2小时，乙用1小时，共12小时。甲每件用原料3单位，乙用1单位，共18单位。求最大利润。
+Status: failed
+Error: 求解失败: ERROR
+Attempts: 1
+LLM Response: {"id":"019ef9c7860a20f1896515aa84658add","object":"chat.completion","created":1782307063,"model":"deepseek-ai/DeepSeek-V3","choices":[{"index":0,"message":{"role":"assistant","content":"```json\n{\"v\":[\"x:甲产品数量\",\"y:乙产品数量\"],\"c\":[\"2*x + 1*y \u003c= 12\",\"3*x + 1*y \u003c= 18\"],\"o\":\"3*x + 5*y\",\"t\":\"maximize\"}\n```"},"finish_reason":"stop"}],"usage":{"prompt_tokens":390,"completion_tokens":59,"total_tokens":449,"prompt_tokens_details":{"cached_tokens":0},"prompt_cache_hit_tokens":0,"prompt_cache_miss_tokens":390},"system_fingerprint":""}
+
+Objective: 0
+
+=== 2026-06-24 21:18:40.248 ===
+Problem: 某工厂生产甲、乙两种产品。甲每件利润3元，乙每件利润5元。甲每件用设备2小时，乙用1小时，共12小时。甲每件用原料3单位，乙用1单位，共18单位。求最大利润。
+Status: success
+Attempts: 1
+LLM Response: n
+{"v":["x:甲产品数量","y:乙产品数量"],"c":["2*x + 1*y <= 12","3*x + 1*y <= 18"],"o":"3*x + 5*y","t":"maximize"}
+
+Objective: 60
+
+=== 2026-06-24 21:18:52.224 ===
+Problem: 背包问题：有三件物品，重量分别是3、2、4，价值分别是2000、3000、5000，背包容量8。求最大价值。
+Status: success
+Attempts: 1
+LLM Response: n
+{"v":["x1:物品1数量","x2:物品2数量","x3:物品3数量"],"c":["3*x1 + 2*x2 + 4*x3 <= 8","x1 <= 1","x2 <= 1","x3 <= 1"],"o":"2000*x1 + 3000*x2 + 5000*x3","t":"maximize"}
+
+Objective: 8000
+
+=== 2026-06-24 21:19:03.276 ===
+Problem: 投资问题：有三种投资A、B、C，金额分别是2万、5万、3万，收益率分别是8%、12%、9%。总资金500万，总项目不超过150个，且B类投资不少于C类。求最大收益。
+Status: success
+Attempts: 1
+LLM Response: n
+{"v":["a:A类投资项目数量","b:B类投资项目数量","c:C类投资项目数量"],"c":["2*a + 5*b + 3*c <= 500","a + b + c <= 150","b >= c"],"o":"0.08*2*a + 0.12*5*b + 0.09*3*c","t":"maximize"}
+
+Objective: 0.08
+
