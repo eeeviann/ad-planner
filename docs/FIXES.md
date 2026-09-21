@@ -246,22 +246,55 @@ UTF-8；再给编译器加上 `-finput-charset=UTF-8 -fexec-charset=UTF-8`
 
 ## 5. 敏感信息与运行日志
 
-### 扫描结论
+### 扫描结论：全量审计了 Git 历史
 
-对全部 20 个文件做了密钥扫描（`sk-` 前缀、`api_key=`、`token=`、`password`、
-`secret`、`Bearer <长串>`），**没有发现任何硬编码的真实密钥或 Token**。
-唯一命中的是 `README.md` 里的占位符 `your_api_key`。
+早先的版本这里曾写过"仓库只有一次提交，不存在历史泄漏隐患"——**这句话是错的**。
+仓库远端实际有 2 个提交、1 个分支（`main`）、无 tag：
 
-仓库只有一次提交（"初始化"），不存在"提交过密钥后又删除"的历史泄漏隐患。
+| commit | 日期 | 说明 | 文件数 |
+| --- | --- | --- | --- |
+| `e6b91fa72d763c27d6888e5744993bcf06705918` | 2026-06-29 | 初始化 | 20 |
+| `43c31eb8def5736e0f3de2d3cc9b5c2f35cce47d` | 2026-09-21 | 修复表达式解析与结果验证；补充测试、文档与架构图 | 35 |
 
-### 但仍有三处风险，已处理
+因为没有其它分支和 tag，所以"扫全部历史"是**穷尽**的，不存在未覆盖的提交。
+对全部 51 个 blob 逐个扫描了下列模式：
 
-1. **`learning_log.txt` 被提交进了公开仓库**，里面包含完整的原始 LLM 响应
-   （含接口返回的 `id`、token 用量统计）以及真实的题目文本。
-   → 已从仓库移除，加入 `.gitignore`，并提供脱敏示例
-   `examples/learning_log.sample.txt`。
+    密钥前缀        sk- / sk_live_ / ghp_ / gho_ / ghu_ / ghs_ / github_pat_
+                    AKIA[0-9A-Z]{16} / AIza... / xox[baprs]-
+    其它            -----BEGIN ... PRIVATE KEY----- / Bearer <20+字符>
+    赋值型          api_key= / apikey / access_token / secret_key /
+                    client_secret / password / passwd / pwd 后跟 12+ 字符
+    其它疑似        40+ 连续 base64 字符 / QQ 邮箱 / 手机号
 
-2. **API Key 通过命令行参数传给 Python 脚本**：
+**结论：没有发现任何硬编码的真实密钥、Token 或密码。**
+
+三处疑似命中，经人工逐条确认为误报：
+
+| 命中位置 | 实际内容 | 判定 |
+| --- | --- | --- |
+| `solver/llm_call.py` | `api_key = resolve_api_key()` | 函数调用，非字面量 → 误报 |
+| `src/llm_client.cpp`（新旧两版各 1 处） | `"ABCDEFGHIJKLMNOPQRSTUVWXYZabc...+/"` | base64 字符表 → 误报 |
+
+真实命中的只有占位符：`.env.example` 与 `README.md` 中的 `your_api_key`。
+
+### 但历史里确实留有这些内容，已处理
+
+1. **`learning_log.txt` 曾在初始化提交中被提交进公开仓库，
+   且至今仍可通过提交历史访问**（`git show e6b91fa72d763c27d6888e5744993bcf06705918:learning_log.txt`）。
+   删除最新版本中的文件，并不等于它会从历史里消失。
+   该文件包含**完整的题目文本**与**完整的原始 LLM 响应**
+   （含接口返回的 `id` 与 token 用量统计）。
+
+   → 其中**不含密钥**，但属于个人运行数据。现已从工作区移除并加入
+   `.gitignore`；同时把这份历史记录整理为
+   `examples/real_llm_run_before_fix.txt` **主动公开**，
+   避免"以为删掉了、其实还在历史里"的误解。
+
+2. **初始化提交的作者邮箱曾是个人 QQ 邮箱（已于 2026-09-21 重写历史移除）**，
+   在公开历史中可见。2026-09 的提交已改用
+   `eeeviann@users.noreply.github.com`。如需一并处理，见下方"重写历史"。
+
+3. **API Key 曾通过命令行参数传给 Python 脚本**：
 
    ```cpp
    std::string cmd = "python3 solver/llm_call.py \"" + api_url_ + "\" \""
@@ -270,20 +303,40 @@ UTF-8；再给编译器加上 `-finput-charset=UTF-8 -fexec-charset=UTF-8`
 
    这样 Key 会出现在进程列表中（`ps` / 任务管理器都看得到），Key 里若含引号
    还会破坏命令。另外这两处 `popen()` / `system()` 都是把字符串直接拼进 shell，
-   属于命令注入面。
+   属于命令注入面。→ 改为通过环境变量 `ADPLANNER_LLM_API_KEY` 传递。
 
-   → 改为通过环境变量 `ADPLANNER_LLM_API_KEY` 传递，命令行上不再出现密钥；
-   同时给路径加了引号包裹，并对写回 JSON 的错误文本做了转义。
+4. **日志会落原始 LLM 响应全文**。→ `LearningLog` 现在只记录
+   "提取后的模型 + 结论"；并新增 `ADPLANNER_LOG=off` 可完全关闭日志。
 
-3. **日志会落原始 LLM 响应全文**。
-   → `LearningLog` 现在只记录"提取后的模型 + 结论"，不再写原始响应；
-   并新增 `ADPLANNER_LOG=off` 环境变量可完全关闭日志。
+### 需要你自己决定的一件事：要不要重写历史
 
-### 建议你自己再确认一遍
+当前**没有发现真实密钥**，所以不清理也不存在密钥泄漏风险。
+但如果不想让上面第 1、2 条的个人数据留在历史里，可以重写历史：
 
 ```bash
-# 万一以后本地跑过再提交，用这条兜一下
-git log -p | grep -iE "sk-[A-Za-z0-9]{16,}|api[_-]?key|token" | head
+# 前提：pip install git-filter-repo，并先完整备份仓库
+git filter-repo --path learning_log.txt --invert-paths
+git push --force origin main
+```
+
+代价：**所有 commit hash 会变**，已有的克隆、fork 和指向旧提交的链接会失效。
+本次没有代做这一步，因为它是不可逆操作，且风险等级不高，应当由你自己权衡。
+
+> 补充：**万一曾经公开过真实密钥**，删文件是不够的——
+> 必须在服务商后台**吊销并重新签发**。密钥一旦被 clone/fork 出去就无法收回，
+> 靠改历史也无法保证安全。
+
+### 自己复查用的命令
+
+```bash
+# 全历史密钥扫描（要带 -p 才扫得到历史 diff）
+git log -p --all | grep -iE "sk-[A-Za-z0-9]{16,}|ghp_|gho_|AKIA[0-9A-Z]{16}|-----BEGIN .*PRIVATE KEY-----" | head
+
+# 列出历史里出现过、但当前已删除的文件
+git log --all --diff-filter=D --name-only --pretty=format:'%h %s' | sort -u
+
+# 确认远端到底有几个提交 / 分支
+git rev-list --all --count && git ls-remote origin
 ```
 
 ---
@@ -313,14 +366,89 @@ git log -p | grep -iE "sk-[A-Za-z0-9]{16,}|api[_-]?key|token" | head
 | --- | --- | --- |
 | C++ 线性解析 + 解验证 | `make test-cpp` | 37 / 37 通过 |
 | Python 表达式解析 | `python tests/test_parser.py` | 31 / 31 通过 |
-| Python 端到端已知答案 | `python tests/test_known_cases.py` | 5 / 5 通过（求解器 × 手工期望值 × 暴力枚举 三方一致） |
-| 端到端集成（真实 C++ 链路） | `python tests/test_agent_pipeline.py` | 4 / 4 场景通过 |
+| Python 端到端已知答案 | `python tests/test_known_cases.py` | 5 / 5 通过（求解器 × 题面期望值 × 暴力枚举 三方一致） |
+| 端到端集成（真实 C++ 链路，LLM 用桩） | `python tests/test_agent_pipeline.py` | 4 / 4 场景通过 |
 
-完整的真实运行输出见 `examples/demo_transcript.txt`。
+产出两份运行记录，用途不同，不要混淆：
+
+| 文件 | 性质 | 说明 |
+| --- | --- | --- |
+| `examples/demo_transcript.txt` | 本地实跑输出 | 由 `tests/make_demo_transcript.py` 生成。其中第 5 段用桩替换了 LLM 调用，段首有明确提示；**不代表真实模型的建模能力** |
+| `examples/real_llm_run_before_fix.txt` | **真实调用大模型**的记录 | 2026-06-24 对 SiliconFlow / DeepSeek-V3 的调用，取自初始化提交中的 `learning_log.txt`，正文未删改。记录的是**修复前**的状态，含四类异常现象 |
 
 ---
 
-## 8. 本次改动文件清单
+## 8. 复审发现的两处表述问题
+
+这两条都不是代码缺陷，而是**文档与事实不符**。
+对一个要拿给导师看的仓库来说，性质不比 bug 轻。
+
+### 8.1 README 里的个人贡献被写强了
+
+原「AI 辅助开发的说明」单独列出了"本人完成的部分"，其中包括
+「定修复原则」「定验收标准」「逐行审查 AI 生成的代码」
+「人工推导期望值」，以及"这些代码我能讲清楚"。
+
+实际情况是：**技术方案与代码主要由 AI 完成**，本人负责提出需求、
+运行程序、检查输出结果，并把发现的问题反馈给 AI 迭代。
+"注意到 500 万资金的收益是 0.08 不合理"这一步是真的；
+但"从现象到根因的分析""定修复原则""逐行审查代码""能逐行讲清代码",
+这些描述**超出了实际参与程度**。
+
+→ 已改写为与实际情况一致的表述，只保留四项：提出需求 / 运行并检查 /
+反馈与迭代 / 复核结论。
+
+技术内容本身**没有删减**——那些分析都留在本文里，
+只是不再声称是本人独立完成的判断。
+
+> 为什么这比代码 bug 更该警惕：代码错了可以改，
+> 而把自己的参与程度写强了，在面试或答辩里一戳就破。
+
+### 8.2 测试演示的题面残缺，且被标成了"真实输出"
+
+README「运行」一节原本写着"真实输出（取自 `tests/test_agent_pipeline.py`
+的实跑记录，未经修饰）"，展示的内容是：
+
+```
+问题: 某工厂生产甲、乙两种产品。甲每件利润3元，乙每件利润5元。求最大利润。
+      ↑ 只有利润，没有设备工时、没有原料限量
+
+LLM 返回的模型 JSON: {..."c":["2*x + 1*y <= 12","3*x + 1*y <= 18"]...}
+      ↑ 却出现了题面里根本没有的两条约束
+```
+
+问题有两层：
+
+1. **标注错误**：这段输出确实来自 `tests/test_agent_pipeline.py`，
+   但该测试**把 LLM 网络调用换成了桩**，桩返回的是预先写死的固定模型。
+   标为"真实输出"，会让读者以为是真实大模型在建模。
+2. **题面残缺**：测试场景里的题目被截短了，只剩利润，
+   而桩返回的模型却带着完整约束。两者叠在一起，
+   读者会得出一个完全错误的结论——"这个程序能从信息不足的题目里
+   自动推导出完整约束"。
+   事实恰恰相反：**本项目明确不保证模型忠实性**
+   （见 README「已知限制」第 2 条）。
+
+→ 已从三方面修正：
+
+- README 中该段改标为「离线集成测试的输出」，并加粗提示
+  "这不是真实大模型的运行结果……不代表真实大模型的建模准确率"；
+- 四个测试场景的题面全部补全为**信息完整**的原文
+  （约束、资源限量、收益率都写进题面），桩返回的模型与题面一一对应；
+- 另外提供 `examples/real_llm_run_before_fix.txt` —— 一份**真实调用大模型**
+  的记录（取自初始化提交中的历史日志），
+  让"真实的端到端效果"有一个独立、不会被与桩混淆的出处。
+
+> 顺带修掉一个设计细节：桩原本靠**题目文本里的关键词**（"工厂"、"投资"、
+> "重试"、"无解"）决定返回哪组模型，这反过来逼着测试题面必须写成
+> 含暗号的假题目。现已改为由测试夹具通过环境变量 `STUB_SCENARIO`
+> 显式指定，题面因此可以保持信息完整。
+
+---
+
+## 9. 改动文件清单
+
+### 8.1 2026-09 修复（第一轮）
 
 **新增**
 
@@ -349,3 +477,71 @@ git log -p | grep -iE "sk-[A-Za-z0-9]{16,}|api[_-]?key|token" | head
 **删除**
 
 - `learning_log.txt`（移出公开仓库）
+
+### 8.2 2026-09 复审后的第二轮修改
+
+针对复审意见（README 个人贡献表述偏强、测试演示易生误解、历史敏感信息、
+README 偏长）所做的调整：
+
+**新增**
+
+- `examples/real_llm_run_before_fix.txt` — 修复前的真实大模型调用记录，
+  取自初始化提交中的 `learning_log.txt`（正文未删改），并在首尾补上
+  来源说明与四类异常的解读
+
+**重写**
+
+- `README.md`
+  - 「AI 辅助开发的说明」按真实参与程度改写：技术方案与代码主要由 AI 完成，
+    本人负责提出需求、运行程序、检查输出、反馈问题——删去
+    "定修复原则 / 定验收标准 / 逐行审查代码 / 手工推导期望值 / 我能逐行讲清"
+    等与实际不符的表述
+  - 「运行」一节的示例输出，从"真实输出"改标为"离线集成测试输出"，
+    并写明 LLM 调用已被替换为桩、不代表建模准确率
+  - 示例题目补全约束条件（设备工时、原料限量），使题面与模型一致
+  - 「一次真实的调试记录」压成摘要，完整分析移入本文第 1 节
+  - 「目录结构」由 38 行压缩为 18 行的顶层概览
+  - 「已知答案案例」中"手工推导的期望值"改为"题面推出的期望值"
+- `tests/test_agent_pipeline.py`
+  - 四个场景的题目全部改为**信息完整**的原文（`PROBLEM_*` 常量）
+  - 桩返回哪组模型改由环境变量 `STUB_SCENARIO` 显式指定，
+    不再依赖题目里的关键词——避免把题面写成含暗号的假题目
+  - 不再打印本机绝对路径（只报解释器目录名），避免把个人目录写进公开记录
+- `tests/stub_llm_call.py`
+  - 文件头明确标注"不调用真实大模型、不能证明建模准确率"
+  - 固定模型与题面一一对应，逐条注明对应关系
+- `tests/make_demo_transcript.py`
+  - 新增 `scrub()`，把 `~` 展开的绝对路径替换为 `<HOME>`
+  - 第 5 段开头增加"这不是真实大模型结果"的提示
+  - 文件头说明哪些段落是真实执行、哪些用了桩
+- `docs/FIXES.md`
+  - 第 5 节更正"仓库只有一次提交"的错误结论，改为全历史审计报告
+    （2 个提交 / 1 个分支 / 51 个 blob 的穷尽扫描结果）
+  - 补充历史中确实留存的个人数据（`learning_log.txt`、作者邮箱）
+    与可选的 `git filter-repo` 清理方案
+- `examples/demo_transcript.txt` — 重新生成（题目补全、路径脱敏、加免责说明）
+
+### 8.3 仓库完整文件清单（35 → 36 个文件）
+
+```
+.env.example                        examples/demo_transcript.txt
+.gitignore                          examples/learning_log.sample.txt
+Makefile                            examples/real_llm_run_before_fix.txt
+README.md                           run.bat
+agent/agent.py                      solver/ip_solver.py
+docs/FIXES.md                       solver/llm_call.py
+docs/architecture.svg               solver/solve.py
+src/ip_solver.cpp                   src/learning_log.cpp  src/learning_log.h
+src/linear_expr.cpp                 src/linear_expr.h
+src/llm_client.cpp                  src/llm_client.h
+src/main.cpp                        src/model_parser.cpp  src/model_parser.h
+src/shell_command.h                 src/solver_call.cpp   src/solver_call.h
+src/verifier.cpp                    src/verifier.h
+tests/make_demo_transcript.py       tests/run_all.py
+tests/stub_llm_call.py              tests/test_agent_pipeline.py
+tests/test_known_cases.py           tests/test_linear_expr.cpp
+tests/test_parser.py
+```
+
+> `learning_log.txt` 不在清单中：它已从工作区移除并加入 `.gitignore`，
+> 但仍存在于历史提交 `e6b91fa72d763c27d6888e5744993bcf06705918` 里，详见本文第 5 节。

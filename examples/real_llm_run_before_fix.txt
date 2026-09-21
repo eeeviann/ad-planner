@@ -1,0 +1,133 @@
+================================================================================
+  ad-planner · 真实大模型调用记录（修复前）
+================================================================================
+
+这份文件是**真实调用大模型**产生的日志，不是测试桩（stub）的输出。
+
+来源
+    本仓库 2026-06-29 首次提交（commit e6b91fa72d763c27d6888e5744993bcf06705918）中曾被一并提交的
+    learning_log.txt。它当时被误提交进了公开仓库，后已从仓库目录移除并
+    加入 .gitignore（理由见下）。此处保留其原始内容作为调试证据，
+    **正文未做任何删改**，仅添加本说明与末尾的注解。
+
+    因此：这段历史仍可通过 Git 提交历史访问到。删除工作区文件并不等于
+    从历史中消失——详见 docs/FIXES.md 第 5 节。
+
+运行时间    2026-06-24 21:12 – 21:19
+模型服务    SiliconFlow 平台 · deepseek-ai/DeepSeek-V3
+记录字段    Problem / Status / Error / Attempts / LLM Response / Objective
+            （格式由 src/learning_log.cpp 写出）
+
+关于密钥
+    这份记录中**不含任何 API Key**。密钥当时通过命令行参数传入，
+    而日志只记录响应体，不记录请求头。但"密钥走命令行参数"本身是个缺陷
+    （会出现在进程列表中），现已改为走环境变量，详见 docs/FIXES.md 第 5 节。
+
+--------------------------------------------------------------------------------
+  如何阅读这份记录：四类异常，都是修复的线索
+--------------------------------------------------------------------------------
+
+1) Error: LLM HTTP 错误 {"code":20015,"message":"The parameter is invalid..."}
+   中文 Windows 上 argv 被按 ANSI 代码页转成 GBK 字节，再按 UTF-8 发出，
+   请求体成了非法 UTF-8，接口直接拒绝。当时误以为是提示词写错了。
+
+2) Error: 未能提取到变量  —— 注意 LLM Response 里那行孤零零的 "n"
+   剥 ```json 代码块围栏时写成了 b1 + 6，而 "```json" 是 7 个字符，
+   于是模型字符串开头永远多一个 "n"，解析自然失败。
+
+3) Error: 求解失败: ERROR
+   求解层抛 ValueError，traceback 直接打到 stdout，C++ 侧只看到无法解析的
+   内容，于是只知道"失败"，不知道原因。
+
+4) 最后一条 Objective: 0.08
+   这是最危险的一条：状态是 success、不抛异常、不打日志，只是答案错了。
+   投资题的"500 万资金的最大收益是 8 分钱"在数学上成立，
+   但在常识上明显不对——正是这个数字牵出了根本问题：
+   目标函数表达式被解析层静默截断。
+
+================================================================================
+  以下为原始日志正文（未改动）
+================================================================================
+
+=== 2026-06-24 21:12:53.173 ===
+Problem: 某工厂生产甲、乙两种产品。甲每件利润3元，乙每件利润5元。甲每件用设备2小时，乙用1小时，共12小时。甲每件用原料3单位，乙用1单位，共18单位。求最大利润。
+Status: failed
+Error: LLM HTTP 错误: {"code":20015,"message":"The parameter is invalid. Please check again.","data":null}
+Attempts: 1
+LLM Response: 
+Objective: 0
+
+=== 2026-06-24 21:14:17.841 ===
+Problem: 某工厂生产甲、乙两种产品。甲每件利润3元，乙每件利润5元。甲每件用设备2小时，乙用1小时，共12小时。甲每件用原料3单位，乙用1单位，共18单位。求最大利润。
+Status: failed
+Error: 未能提取到变量
+Attempts: 1
+LLM Response: {"id":"019ef9c456ada8cd5eb30d2df8b00789","object":"chat.completion","created":1782306854,"model":"deepseek-ai/DeepSeek-V3","choices":[{"index":0,"message":{"role":"assistant","content":"```json\n{\"v\":[\"x:甲产品数量\",\"y:乙产品数量\"],\"c\":[\"2*x + 1*y \u003c= 12\",\"3*x + 1*y \u003c= 18\"],\"o\":\"3*x + 5*y\",\"t\":\"maximize\"}\n```"},"finish_reason":"stop"}],"usage":{"prompt_tokens":390,"completion_tokens":59,"total_tokens":449,"prompt_tokens_details":{"cached_tokens":0},"prompt_cache_hit_tokens":0,"prompt_cache_miss_tokens":390},"system_fingerprint":""}
+
+Objective: 0
+
+=== 2026-06-24 21:15:48.312 ===
+Problem: 某工厂生产甲、乙两种产品。甲每件利润3元，乙每件利润5元。甲每件用设备2小时，乙用1小时，共12小时。甲每件用原料3单位，乙用1单位，共18单位。求最大利润。
+Status: failed
+Error: 未能提取到变量
+Attempts: 1
+LLM Response: {"id":"019ef9c5bb04f242e354be34ad15ed4e","object":"chat.completion","created":1782306945,"model":"deepseek-ai/DeepSeek-V3","choices":[{"index":0,"message":{"role":"assistant","content":"```json\n{\"v\":[\"x:甲产品数量\",\"y:乙产品数量\"],\"c\":[\"2*x + 1*y \u003c= 12\",\"3*x + 1*y \u003c= 18\"],\"o\":\"3*x + 5*y\",\"t\":\"maximize\"}\n```"},"finish_reason":"stop"}],"usage":{"prompt_tokens":390,"completion_tokens":59,"total_tokens":449,"prompt_tokens_details":{"cached_tokens":0},"prompt_cache_hit_tokens":0,"prompt_cache_miss_tokens":390},"system_fingerprint":""}
+
+Objective: 0
+
+=== 2026-06-24 21:17:46.406 ===
+Problem: 某工厂生产甲、乙两种产品。甲每件利润3元，乙每件利润5元。甲每件用设备2小时，乙用1小时，共12小时。甲每件用原料3单位，乙用1单位，共18单位。求最大利润。
+Status: failed
+Error: 求解失败: ERROR
+Attempts: 1
+LLM Response: {"id":"019ef9c7860a20f1896515aa84658add","object":"chat.completion","created":1782307063,"model":"deepseek-ai/DeepSeek-V3","choices":[{"index":0,"message":{"role":"assistant","content":"```json\n{\"v\":[\"x:甲产品数量\",\"y:乙产品数量\"],\"c\":[\"2*x + 1*y \u003c= 12\",\"3*x + 1*y \u003c= 18\"],\"o\":\"3*x + 5*y\",\"t\":\"maximize\"}\n```"},"finish_reason":"stop"}],"usage":{"prompt_tokens":390,"completion_tokens":59,"total_tokens":449,"prompt_tokens_details":{"cached_tokens":0},"prompt_cache_hit_tokens":0,"prompt_cache_miss_tokens":390},"system_fingerprint":""}
+
+Objective: 0
+
+=== 2026-06-24 21:18:40.248 ===
+Problem: 某工厂生产甲、乙两种产品。甲每件利润3元，乙每件利润5元。甲每件用设备2小时，乙用1小时，共12小时。甲每件用原料3单位，乙用1单位，共18单位。求最大利润。
+Status: success
+Attempts: 1
+LLM Response: n
+{"v":["x:甲产品数量","y:乙产品数量"],"c":["2*x + 1*y <= 12","3*x + 1*y <= 18"],"o":"3*x + 5*y","t":"maximize"}
+
+Objective: 60
+
+=== 2026-06-24 21:18:52.224 ===
+Problem: 背包问题：有三件物品，重量分别是3、2、4，价值分别是2000、3000、5000，背包容量8。求最大价值。
+Status: success
+Attempts: 1
+LLM Response: n
+{"v":["x1:物品1数量","x2:物品2数量","x3:物品3数量"],"c":["3*x1 + 2*x2 + 4*x3 <= 8","x1 <= 1","x2 <= 1","x3 <= 1"],"o":"2000*x1 + 3000*x2 + 5000*x3","t":"maximize"}
+
+Objective: 8000
+
+=== 2026-06-24 21:19:03.276 ===
+Problem: 投资问题：有三种投资A、B、C，金额分别是2万、5万、3万，收益率分别是8%、12%、9%。总资金500万，总项目不超过150个，且B类投资不少于C类。求最大收益。
+Status: success
+Attempts: 1
+LLM Response: n
+{"v":["a:A类投资项目数量","b:B类投资项目数量","c:C类投资项目数量"],"c":["2*a + 5*b + 3*c <= 500","a + b + c <= 150","b >= c"],"o":"0.08*2*a + 0.12*5*b + 0.09*3*c","t":"maximize"}
+
+Objective: 0.08
+
+================================================================================
+  注解（以上为原始记录，以下为事后补充）
+================================================================================
+
+同一批测试里的三道题，只有投资题被这个 bug 打中：
+
+    工厂题    Objective: 60      —— 正确（目标函数 3*x + 5*y 不触发该 bug）
+    背包题    Objective: 8000    —— 正确（同上）
+    投资题    Objective: 0.08    —— **错误**（目标函数是混合系数写法，
+                                     正则第一条就命中了裸数字 0.08）
+
+修复后，同一个投资模型的离线求解结果是 60.0，对应"500 万全部投入
+收益率最高的 B 类（12%）"，与直觉一致。可复现的输出见
+examples/demo_transcript.txt 第 1 段。
+
+四类异常的根因、修复方案与验证过程，见 docs/FIXES.md。
+
+要拿到"修复后"的真实调用记录，需要自己配置 SILICONFLOW_API_KEY 后
+运行本程序——本项目不再附带任何真实调用日志，以免把个人题目与调用
+记录持续写进公开仓库（ADPLANNER_LOG=off 可完全关闭日志）。

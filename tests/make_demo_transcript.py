@@ -40,13 +40,28 @@ except Exception:
 w("  Python: %s   ortools: %s   OS: %s"
   % (platform.python_version(), ortools_ver, platform.system()))
 w("=" * 72)
+w("")
+w("  说明：本文件由 tests/make_demo_transcript.py 自动生成，内容为本地实跑输出。")
+w("  其中第 5 段用桩替换了 LLM 网络调用（见该段开头的提示），")
+w("  其余各段均为真实执行结果。真实大模型调用记录见 examples/real_llm_run_before_fix.txt。")
+
+
+def scrub(text):
+    """把本机绝对路径（含用户名）替换掉，避免把个人目录写进公开仓库。"""
+    if not text:
+        return text
+    home = os.path.expanduser("~")
+    for pat in {home, home.replace("\\", "/"), home.replace("/", "\\")}:
+        if pat:
+            text = text.replace(pat, "<HOME>")
+    return text
 
 
 def run_solver(model):
     proc = subprocess.run([PY, os.path.join("solver", "solve.py")],
                           input=json.dumps(model, ensure_ascii=False),
                           capture_output=True, text=True, cwd=ROOT)
-    return proc.stdout.strip()
+    return scrub(proc.stdout.strip())
 
 
 def run_cmd(title, args, cwd=ROOT, header=None):
@@ -54,7 +69,7 @@ def run_cmd(title, args, cwd=ROOT, header=None):
     w("$ " + (header or " ".join(args)))
     w("")
     proc = subprocess.run(args, capture_output=True, text=True, cwd=cwd)
-    out = (proc.stdout + proc.stderr).rstrip()
+    out = scrub((proc.stdout + proc.stderr).rstrip())
     for line in out.splitlines():
         w(line)
     w("")
@@ -111,10 +126,18 @@ run_cmd("known cases", [PY, os.path.join("tests", "test_known_cases.py")],
 
 w("")
 w("-" * 72)
-w("5. 端到端集成测试（C++ 全链路，仅把 LLM 网络调用换成桩）")
+w("5. 端到端集成测试：真实 C++ 全链路，但 LLM 调用替换为桩（离线，无需 API Key）")
 w("-" * 72)
 w("")
-w("   这一步会真实启动 ad-planner.exe，跑通")
+w("   ⚠️ 这一段**不是**真实大模型的运行结果：")
+w("   LLM 的网络调用被 tests/stub_llm_call.py 替换成了预先写死的固定模型，")
+w("   用来验证 C++ 控制层（模型解析 → 求解器调用 → 独立验证 → 失败重试）")
+w("   这条链路是否跑通。它不代表真实大模型的建模准确率。")
+w("")
+w("   真实调用大模型（SiliconFlow / DeepSeek-V3）的记录另见")
+w("   examples/real_llm_run_before_fix.txt。")
+w("")
+w("   本段实际启动 ad-planner.exe，跑通")
 w("   main.cpp → llm_client.cpp → model_parser.cpp → solver_call.cpp")
 w("   → solve.py → verifier.cpp 的完整链路。")
 w("")
