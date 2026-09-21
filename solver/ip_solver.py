@@ -179,6 +179,7 @@ class IntOptimizer:
             "total_exposure": value,
             "ad_cost": ad_cost,
             "plan_cost": plan_cost,
+            "plan_budget": plan_budget,
             "reward_cost": reward_cost,
             "child_coverage": child_cov,
             "parent_coverage": parent_cov,
@@ -201,7 +202,9 @@ def print_result(r: Dict):
     print(f"  总曝光     = {r['total_exposure']} 万次")
     print(f"{'='*40}")
     print(f"  广告成本   = {r['ad_cost']} 万  (≤400)")
-    print(f"  策划成本   = {r['plan_cost']} 万  (≤{r['plan_cost']})")
+    # 原来这里把上限也写成了 r['plan_cost']，等于"策划成本 ≤ 策划成本"，
+    # 应该显示真正的预算上限
+    print(f"  策划成本   = {r['plan_cost']} 万  (≤{r['plan_budget']})")
     print(f"  奖励成本   = {r['reward_cost']} 万  (≤149)")
     print(f"  儿童覆盖   = {r['child_coverage']} 百万 (≥5)")
     print(f"  家长覆盖   = {r['parent_coverage']} 百万 (≥5)")

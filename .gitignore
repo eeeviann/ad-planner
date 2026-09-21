@@ -1,0 +1,47 @@
+# ---- 运行产物 / 可执行文件 ----------------------------------------------
+ad-planner
+ad-planner.exe
+ip_solver
+ip_solver.exe
+test_core
+test_core.exe
+*.exe
+
+# ---- 编译中间产物 --------------------------------------------------------
+*.o
+*.obj
+*.ilk
+*.pdb
+
+# ---- 运行日志 ------------------------------------------------------------
+# learning_log.txt 会记录真实的题目、模型和结论，属于本地调试产物，
+# 不应进入公开仓库。README 中说明的运行示例见 examples/learning_log.sample.txt
+learning_log.txt
+learning_log*.txt
+!examples/learning_log.sample.txt
+
+# ---- 密钥与本地配置 ------------------------------------------------------
+.env
+.env.local
+.env.*.local
+*.key
+secrets.json
+
+# ---- Python --------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# ---- 编辑器 / 系统 -------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 求解器临时文件 ------------------------------------------------------
+adplanner_input.json
+adplanner_output.json
+adplanner_output.err

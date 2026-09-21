@@ -12,9 +12,12 @@ struct LLMResponse {
 
 class LLMClient {
 public:
-    LLMClient(const std::string& api_url, const std::string& api_key);
+    // python_path 留空时按平台取默认值（Windows: python，其他: python3）
+    LLMClient(const std::string& api_url,
+              const std::string& api_key,
+              const std::string& python_path = "",
+              const std::string& script_path = "solver/llm_call.py");
     ~LLMClient();
-
 
     LLMResponse chat(const std::string& system_prompt,
                      const std::string& user_message,
@@ -25,6 +28,8 @@ public:
 private:
     std::string api_url_;
     std::string api_key_;
+    std::string python_path_;
+    std::string script_path_;
 };
 
-#endif
+#endif  // LLM_CLIENT_H

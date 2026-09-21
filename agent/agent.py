@@ -37,7 +37,10 @@ class AdPlanningAgent:
 如果用户只是打招呼或询问，不输出JSON。"""
 
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.environ.get("SILICONFLOW_KEY", "")
+        # 兼容多个环境变量名：README 用的是 SILICONFLOW_API_KEY，
+        # run.bat 与旧版本用的是 SILICONFLOW_KEY
+        self.api_key = api_key or os.environ.get("SILICONFLOW_API_KEY", "") \
+            or os.environ.get("SILICONFLOW_KEY", "")
         self.base_url = "https://api.siliconflow.cn/v1/chat/completions"
         self.solver = IntOptimizer()
 

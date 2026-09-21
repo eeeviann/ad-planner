@@ -1,17 +1,27 @@
 #include "learning_log.h"
-#include <sstream>
-#include <iomanip>
-#include <sys/time.h>
-#include <fstream>
 
+#include <chrono>
+#include <ctime>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
+
+// 修复前这里用的是 <sys/time.h> + gettimeofday()，是 POSIX 专有接口，
+// 在 Windows 上直接编译不过。改用 C++17 标准库的 chrono，跨平台。
 static std::string timestamp() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
+    const auto now = std::chrono::system_clock::now();
+    const auto millis =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()) %
+        1000;
+    const std::time_t t = std::chrono::system_clock::to_time_t(now);
+
+    std::tm tm_buf{};
+    if (const std::tm* p = std::localtime(&t)) tm_buf = *p;
+
     std::ostringstream ss;
-    std::time_t t = tv.tv_sec;
-    std::tm* now = std::localtime(&t);
-    ss << std::put_time(now, "%Y-%m-%d %H:%M:%S");
-    ss << "." << std::setfill('0') << std::setw(3) << (tv.tv_usec / 1000);
+    ss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S");
+    ss << "." << std::setfill('0') << std::setw(3) << millis.count();
     return ss.str();
 }
 
@@ -20,11 +30,10 @@ LearningLog::LearningLog(const std::string& log_path)
 
 LearningLog::~LearningLog() {}
 
-void LearningLog::log_attempt(int attempt_no, const std::string& model_json,
-                              const std::string& model_str, const std::string& problem) {
-    total_attempts_++;
-    current_llm_response_ = model_json;
-    current_model_ = model_str;
+void LearningLog::log_attempt(int attempt_no, const std::string& final_model,
+                              const std::string& problem) {
+    total_attempts_ = attempt_no;
+    current_model_ = final_model;
     current_problem_ = problem;
 }
 
@@ -36,7 +45,6 @@ void LearningLog::mark_success(double obj_value) {
     LogEntry e;
     e.timestamp = timestamp();
     e.problem = current_problem_;
-    e.llm_response = current_llm_response_;
     e.attempt_count = total_attempts_;
     e.status = "success";
     e.error = "";
@@ -51,7 +59,6 @@ void LearningLog::mark_failure(const std::string& error) {
     LogEntry e;
     e.timestamp = timestamp();
     e.problem = current_problem_;
-    e.llm_response = current_llm_response_;
     e.attempt_count = total_attempts_;
     e.status = "failed";
     e.error = error;
@@ -62,16 +69,16 @@ void LearningLog::mark_failure(const std::string& error) {
 
 void LearningLog::save() {
     std::ofstream f(log_path_, std::ios::app);
+    if (!f) return;
     for (const auto& e : entries_) {
         f << "=== " << e.timestamp << " ===\n";
         f << "Problem: " << e.problem << "\n";
         f << "Status: " << e.status << "\n";
         if (!e.error.empty()) f << "Error: " << e.error << "\n";
         f << "Attempts: " << e.attempt_count << "\n";
-        f << "LLM Response: " << e.llm_response << "\n";
+        f << "Final Model: " << e.final_model << "\n";
         f << "Objective: " << e.objective_value << "\n";
         f << "\n";
     }
-    f.close();
     entries_.clear();
 }
